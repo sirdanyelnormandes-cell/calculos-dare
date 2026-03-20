@@ -26,6 +26,15 @@
       padding: 22px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     }
+    h1, h2, h3, p { margin-top: 0; }
+    .alert {
+      background: #eef6ff;
+      border: 1px solid #cfe4ff;
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 18px;
+      font-size: 14px;
+    }
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -47,28 +56,64 @@
       border-radius: 10px;
       font-size: 15px;
     }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
     .buttons {
       margin-top: 18px;
       display: flex;
       gap: 10px;
+      flex-wrap: wrap;
     }
     button {
       border: none;
       border-radius: 12px;
       padding: 12px 18px;
       cursor: pointer;
+      font-size: 15px;
       font-weight: 700;
     }
-    .primary { background: #111827; color: #fff; }
-    .secondary { background: #fff; border: 1px solid #d1d5db; }
-
+    .primary {
+      background: #111827;
+      color: #fff;
+    }
+    .secondary {
+      background: #fff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .error {
+      margin-top: 14px;
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      padding: 12px;
+      border-radius: 12px;
+    }
+    .success {
+      margin-top: 14px;
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      padding: 12px;
+      border-radius: 12px;
+    }
     .result-row {
       display: flex;
       justify-content: space-between;
+      gap: 10px;
       padding: 10px 0;
       border-bottom: 1px solid #e5e7eb;
+      font-size: 15px;
     }
-
+    .memory {
+      background: #f3f4f6;
+      padding: 14px;
+      border-radius: 12px;
+      margin-top: 16px;
+      font-size: 14px;
+    }
     .total {
       background: #111827;
       color: #fff;
@@ -76,9 +121,22 @@
       border-radius: 14px;
       margin-top: 16px;
     }
-
+    .total small {
+      color: #cbd5e1;
+      display: block;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
     .total strong {
       font-size: 32px;
+    }
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -87,34 +145,48 @@
     <div class="card">
       <h1>Calculadora DARE de Frete</h1>
 
+      <div class="alert">
+        Utilizamos a seguinte alíquota 
+        <strong>CNPJ = 12%</strong> e <strong>CPF = 17,5%</strong>.
+      </div>
+
       <div class="grid">
+
         <div class="field">
-          <label>Tipo de cliente</label>
+          <label for="tipoPessoa">Tipo de cliente</label>
           <select id="tipoPessoa">
-            <option value="cnpj">CNPJ (12%)</option>
-            <option value="cpf">CPF (17,5%)</option>
+            <option value="cnpj">Pessoa jurídica (CNPJ)</option>
+            <option value="cpf">Pessoa física (CPF)</option>
           </select>
         </div>
 
         <div class="field">
-          <label>Peso (toneladas)</label>
-          <input id="peso" type="number" value="1" />
+          <label for="peso">Peso (toneladas)</label>
+          <input id="peso" type="number" step="0.01" value="1" />
         </div>
 
         <div class="field">
-          <label>Valor do diesel</label>
-          <input id="diesel" type="number" value="6.5" />
+          <label for="diesel">Valor do diesel</label>
+          <input id="diesel" type="number" step="0.01" value="6.50" />
         </div>
 
         <div class="field">
-          <label>Distância (km)</label>
-          <input id="km" type="number" value="201" />
+          <label for="aliquota">Alíquota automática</label>
+          <input id="aliquota" type="text" value="12%" readonly />
+        </div>
+
+        <div class="field">
+          <label for="km">Distância (km)</label>
+          <input id="km" type="number" step="1" value="201" />
         </div>
       </div>
 
       <div class="buttons">
         <button class="primary" onclick="calcular()">Calcular</button>
+        <button class="secondary" onclick="copiarResumo()">Copiar resumo</button>
       </div>
+
+      <div id="mensagem"></div>
     </div>
 
     <div class="card">
@@ -131,12 +203,32 @@
       </div>
 
       <div class="result-row">
-        <span>Base</span>
+        <span>Tipo de cliente</span>
+        <strong id="rTipo">-</strong>
+      </div>
+
+      <div class="result-row">
+        <span>Alíquota</span>
+        <strong id="rAliquota">-</strong>
+      </div>
+
+      <div class="result-row">
+        <span>Valor da faixa</span>
+        <strong id="rValorFaixa">-</strong>
+      </div>
+
+      <div class="result-row">
+        <span>Base de cálculo</span>
         <strong id="rBase">-</strong>
       </div>
 
+      <div class="memory">
+        <div><strong>Memória do cálculo</strong></div>
+        <div id="rMemoria" style="margin-top:8px;">-</div>
+      </div>
+
       <div class="total">
-        <small>Imposto</small>
+        <small>Imposto final</small>
         <strong id="rImposto">R$ 0,00</strong>
       </div>
     </div>
@@ -148,38 +240,59 @@
       { min: 51, max: 100, fixedValue: 17.88 },
       { min: 101, max: 150, fixedValue: 20.26 },
       { min: 151, max: 200, fixedValue: 22.13 },
-      { min: 201, max: 250, fixedValue: 23.77 },
-      { min: 251, max: 300, fixedValue: 26.05 }
+      { min: 201, max: 250, fixedValue: 23.77 }
     ];
 
-    function getBracket(km) {
-      return DISTANCE_BRACKETS.find(b => km >= b.min && km <= b.max);
+    function money(value) {
+      return Number(value || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+      });
     }
 
-    function money(v) {
-      return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    function getBracket(distanceKm) {
+      return DISTANCE_BRACKETS.find(item => distanceKm >= item.min && distanceKm <= item.max);
+    }
+
+    function atualizarAliquota() {
+      const tipo = document.getElementById("tipoPessoa").value;
+      document.getElementById("aliquota").value = tipo === "cpf" ? "17,5%" : "12%";
     }
 
     function calcular() {
-      const km = Number(document.getElementById("km").value);
-      const peso = Number(document.getElementById("peso").value);
-      const diesel = Number(document.getElementById("diesel").value);
+      const km = parseFloat(document.getElementById("km").value);
+      const peso = parseFloat(document.getElementById("peso").value);
+      const diesel = parseFloat(document.getElementById("diesel").value);
       const tipo = document.getElementById("tipoPessoa").value;
-
       const aliquota = tipo === "cpf" ? 0.175 : 0.12;
 
-      const faixa = getBracket(km);
-      if (!faixa) return alert("KM fora da tabela");
+      if (!km || !peso || !diesel) {
+        alert("Preencha km, peso e diesel.");
+        return;
+      }
 
-      const base = faixa.fixedValue * peso * diesel;
+      const bracket = getBracket(km);
+      if (!bracket) {
+        alert("KM fora da tabela.");
+        return;
+      }
+
+      const base = bracket.fixedValue * peso * diesel;
       const imposto = base * aliquota;
 
       document.getElementById("rDistancia").textContent = km + " km";
-      document.getElementById("rFaixa").textContent = faixa.min + "-" + faixa.max;
+      document.getElementById("rFaixa").textContent = bracket.min + " a " + bracket.max + " km";
+      document.getElementById("rTipo").textContent = tipo === "cpf" ? "CPF" : "CNPJ";
+      document.getElementById("rAliquota").textContent = tipo === "cpf" ? "17,5%" : "12%";
+      document.getElementById("rValorFaixa").textContent = money(bracket.fixedValue);
       document.getElementById("rBase").textContent = money(base);
+      document.getElementById("rMemoria").textContent =
+        bracket.fixedValue + " × " + peso + " × " + diesel + " × " + (aliquota * 100).toFixed(1) + "%";
       document.getElementById("rImposto").textContent = money(imposto);
     }
 
+    document.getElementById("tipoPessoa").addEventListener("change", atualizarAliquota);
+    atualizarAliquota();
     calcular();
   </script>
 </body>
